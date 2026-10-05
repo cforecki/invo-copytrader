@@ -1,0 +1,9 @@
+.env
+*.env
+state/
+data/
+reports/
+approved_portfolios.json
+__pycache__/
+.pytest_cache/
+*.tmp

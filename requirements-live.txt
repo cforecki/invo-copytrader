@@ -1,0 +1,5 @@
+# Only needed for --live. Paper mode and the screener need requirements.txt only.
+-r requirements.txt
+hyperliquid-python-sdk>=0.24,<0.25
+eth-account>=0.13
+ccxt>=4.5
