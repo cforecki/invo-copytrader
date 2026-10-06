@@ -258,6 +258,22 @@ python ta_features.py ETH --interval 4h --all --csv eth_4h.csv   # every indicat
   - Indecision/shape patterns (doji, spinning top, high-wave, marubozu, long/short line) are labeled
     as such, not as bullish or bearish. TA-Lib's sign for them is just the candle color.
 
+**Backtest the patterns yourself:**
+
+```sh
+python pattern_backtest.py                               # BTC/ETH/SOL 1h, 5000 bars, horizons 4/12/24
+```
+
+The backtest enters at the next bar's open, so there is no look-ahead, and charges fees on both sides.
+Patterns are chosen on the first half of the data and judged on the second half, which they never saw.
+It also reports "excess" return, net of plain trend drift, and a sequential, non-overlapping equity
+simulation against buy-and-hold.
+
+**Result of the 2026-10-06 run (Mar–Oct 2026 data):**
+- Across all signals, patterns lost money after fees (−4 to −10 bps per trade at 4h/12h).
+- Patterns selected on the first half mostly failed on the second half (0/3, 1/6, 1/6 stayed net-positive).
+- Every simulated strategy underperformed buy-and-hold.
+
 > **Analysis only.** None of this feeds `bot.py`'s decisions. Candlestick patterns have weak
 > out-of-sample evidence, and none of these signals has been validated for this strategy. Using one as
 > an entry/exit filter would need its own backtest first. Past behavior of a pattern or indicator does
@@ -277,6 +293,7 @@ python ta_features.py ETH --interval 4h --all --csv eth_4h.csv   # every indicat
 | `config.py` | Env-var config with validation and a rate-budget check |
 | `state.py` | Atomic JSON state and fills log |
 | `ratelimit.py` | Sliding-window limiter |
+| `pattern_backtest.py` | Optional: in-sample/out-of-sample backtest of candlestick patterns on real HL candles |
 | `ta_features.py` | Optional: TA-Lib candlestick patterns + indicators on real HL candles (analysis only) |
 
 ## What is verified vs. assumed
