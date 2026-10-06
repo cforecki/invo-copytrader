@@ -36,6 +36,17 @@ log = logging.getLogger("invo.bot")
 DISCLAIMER = ("Copy-trading carries substantial risk of loss. Past performance of any trader "
               "does not guarantee future results. This software provides no investment advice.")
 MAX_CONSECUTIVE_ERRORS = 10
+TOKEN_CHECK_INTERVAL_S = 86400
+TOKEN_WARN_DAYS = 14
+
+
+def check_token_expiry(invo) -> float | None:
+    """Daily: warn well before the long-lived refresh token runs out (then the bot exits 3)."""
+    days = invo.refresh_token_days_remaining()
+    if days is not None and days < TOKEN_WARN_DAYS:
+        log.warning("Invo refresh token expires in %.1f days. Capture a new one and run "
+                    "`python invo_auth.py import` (see README) before then.", days)
+    return days
 
 
 def inv_key(inv: dict) -> str | None:
@@ -354,8 +365,12 @@ def main(argv=None) -> int:
     signal.signal(signal.SIGTERM, lambda *_: stop.update(flag=True))
     signal.signal(signal.SIGINT, lambda *_: stop.update(flag=True))
     errors = 0
+    last_token_check = 0.0
     while not stop["flag"]:
         t0 = time.time()
+        if t0 - last_token_check > TOKEN_CHECK_INTERVAL_S:
+            last_token_check = t0
+            check_token_expiry(invo)
         try:
             bot.cycle()
             errors = 0

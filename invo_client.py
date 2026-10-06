@@ -32,6 +32,7 @@ from typing import Any
 import requests
 
 from ratelimit import SlidingWindowLimiter
+from token_store import TokenStore, persistence_enabled
 
 log = logging.getLogger("invo.client")
 
@@ -106,6 +107,30 @@ def jwt_user_id(token: str) -> str | None:
         return None
 
 
+def _pick_freshest(candidates: list[tuple[str, str | None]]) -> tuple[str | None, str | None]:
+    """Among (source, token) pairs, return the unexpired token with the latest expiry.
+
+    A token whose expiry can't be decoded ranks below any decodable valid one (the server
+    decides). If every candidate is expired, the most recent expired one is returned so
+    the caller can fail with the exact expiry date instead of "no credentials".
+    """
+    now = time.time()
+    best, best_src, best_exp = None, None, -1.0
+    expired, expired_src, expired_exp = None, None, -1.0
+    for src, tok in candidates:
+        if not tok:
+            continue
+        exp = jwt_expiry(tok)
+        if exp is not None and exp <= now:
+            if exp > expired_exp:  # remembered only so refresh() can report WHEN it expired
+                expired, expired_src, expired_exp = tok, src, exp
+            continue
+        rank = exp if exp is not None else 0.0
+        if rank > best_exp:
+            best, best_src, best_exp = tok, src, rank
+    return (best, best_src) if best else (expired, expired_src)
+
+
 def _decode_body(text: str) -> Any:
     try:
         return json.loads(text)
@@ -125,15 +150,40 @@ class InvoClient:
         access_token: str | None = None,
         limiter: SlidingWindowLimiter | None = None,
         session: requests.Session | None = None,
+        store: TokenStore | None = None,
+        persist: bool | None = None,
     ):
-        self.refresh_token = _strip_bearer(refresh_token or os.environ.get("INVO_REFRESH_TOKEN"))
-        self.access_token = _strip_bearer(access_token or os.environ.get("INVO_ACCESS_TOKEN"))
+        self.persist = persistence_enabled() if persist is None else persist
+        self.store = (store or TokenStore()) if self.persist else None
+        saved = self.store.load() if self.store else {}
+
+        # Pick the freshest unexpired token from: explicit arg / env var, and the saved file.
+        self.refresh_token, self.refresh_source = _pick_freshest([
+            ("argument" if refresh_token else "env INVO_REFRESH_TOKEN",
+             _strip_bearer(refresh_token or os.environ.get("INVO_REFRESH_TOKEN"))),
+            (f"file {self.store.path}" if self.store else "file", _strip_bearer(saved.get("refresh_token"))),
+        ])
+        self.access_token, _ = _pick_freshest([
+            ("env", _strip_bearer(access_token or os.environ.get("INVO_ACCESS_TOKEN"))),
+            ("file", _strip_bearer(saved.get("access_token"))),
+        ])
         if not self.refresh_token and not self.access_token:
-            raise InvoAuthError("No Invo credentials: neither INVO_REFRESH_TOKEN nor INVO_ACCESS_TOKEN is set.")
+            raise InvoAuthError("No usable Invo credentials: INVO_REFRESH_TOKEN / INVO_ACCESS_TOKEN unset "
+                                "or expired, and no valid saved token file.")
         budget = int(os.environ.get("INVO_RATE_LIMIT", "220"))
         self.limiter = limiter or SlidingWindowLimiter(budget, 300.0)
         self.http = session or requests.Session()
         self.calls_made = 0
+        # Seed / update the file when the chosen refresh token isn't what's saved there.
+        if self.store and self.refresh_token and self.refresh_token != _strip_bearer(saved.get("refresh_token")):
+            self.save_tokens()
+
+    def save_tokens(self) -> None:
+        if not self.store:
+            return
+        self.store.save(self.refresh_token, self.access_token,
+                        jwt_expiry(self.refresh_token) if self.refresh_token else None,
+                        jwt_expiry(self.access_token) if self.access_token else None)
 
     # ---- auth -------------------------------------------------------------
 
@@ -172,9 +222,12 @@ class InvoClient:
         if resp.status_code != 200 or not isinstance(data, dict) or not data.get("accessToken"):
             raise InvoAuthError(f"Token refresh rejected (HTTP {resp.status_code}): {str(data)[:200]}")
         self.access_token = _strip_bearer(data["accessToken"])
-        if data.get("refreshToken"):  # rotate if the server issues a new one
+        rotated = bool(data.get("refreshToken")) and _strip_bearer(data["refreshToken"]) != self.refresh_token
+        if rotated:  # the server issued a new refresh token -- keep it, or we'd lose access later
             self.refresh_token = _strip_bearer(data["refreshToken"])
-        log.info("Invo access token refreshed")
+        self.save_tokens()
+        log.info("Invo access token refreshed%s%s", " (refresh token rotated)" if rotated else "",
+                 f"; saved to {self.store.path}" if self.store else "")
 
     def _ensure_token(self) -> None:
         if not self._access_valid():

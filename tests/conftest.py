@@ -25,6 +25,14 @@ def inv(i, coin="BTC", long=True, entry=100.0, exit_=None, lev=2, size=10.0,
 
 
 @pytest.fixture(autouse=True)
+def _isolated_token_file(monkeypatch, tmp_path):
+    """Never read or write the real ~/.config token file from tests."""
+    monkeypatch.setenv("INVO_TOKEN_FILE", str(tmp_path / "tokens.json"))
+    monkeypatch.delenv("INVO_REFRESH_TOKEN", raising=False)
+    monkeypatch.delenv("INVO_ACCESS_TOKEN", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
     import hl_client
 

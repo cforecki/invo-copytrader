@@ -7,3 +7,4 @@ approved_portfolios.json
 __pycache__/
 .pytest_cache/
 *.tmp
+tokens.json

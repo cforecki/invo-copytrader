@@ -238,7 +238,7 @@ def main(argv=None) -> int:
             print(f"\nERROR: {e}", file=sys.stderr)
             return 2
         days = client.refresh_token_days_remaining()
-        if days is not None and days < 3:
+        if days is not None and days < 14:
             log.warning("INVO_REFRESH_TOKEN expires in %.1f days -- re-auth soon", days)
 
     try:

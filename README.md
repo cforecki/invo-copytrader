@@ -47,12 +47,40 @@ Invo has no public API. The bot uses the same authenticated API the web app uses
    with `eyJ`).
 5. **Access token (optional, about 10 min life).** Copy the `Authorization` header from any other request,
    for example `get_portfolio_by_id`.
-6. Put them in `.env` as `INVO_REFRESH_TOKEN=` / `INVO_ACCESS_TOKEN=`, with or without the `Bearer ` prefix.
+6. Save it **once**, using either method:
+   - `python invo_auth.py import`, then paste it at the hidden prompt. The tool checks the token with
+     Invo before saving it.
+   - Put it in `.env` as `INVO_REFRESH_TOKEN=`, or in a cloud environment setting. The `Bearer `
+     prefix is optional.
 
-The client decodes each token's `expires` claim locally and refreshes the access token before it lapses.
-When the refresh token itself is expired or rejected, both tools stop with exit code 2 (screener) or 3
-(bot) and print these re-auth steps. They never carry on with empty data. The screener warns when the
-refresh token has less than 3 days left.
+### Automatic refresh and saving
+
+After that one capture, everything is automatic:
+
+- The short-lived access token (about 10 minutes) is refreshed before it expires, and again after any
+  401 response.
+- **Every refresh is saved** to `~/.config/invo-copytrader/tokens.json`, which you can move with
+  `INVO_TOKEN_FILE`.
+  - The file is readable only by you (mode 600) and is written atomically. It lives outside the repo
+    and is gitignored anyway.
+  - If Invo ever issues a new refresh token, the new one is saved too, so a restart never falls back
+    to a stale token.
+- On startup the client uses the **freshest unexpired** token from the env var and the saved file.
+- `python invo_auth.py status` shows expiry dates and where the token came from. It never prints
+  token values. `python invo_auth.py refresh` forces a refresh.
+- The refresh token lasts about **a year**. The screener and bot warn once it has **less than 14
+  days** left, and the bot repeats the check daily.
+  - When it finally expires, both tools stop (exit code 2 or 3) and print the re-auth steps. They
+    never carry on with empty data.
+- To turn saving off, set `INVO_PERSIST_TOKENS=0`.
+
+**What can't be automated: the very first token.** Invo logs in through its web app with Turnkey
+(passkey or email code) and has no login API. No reference project has one either; invo-mirror-bot's
+"auto re-login" claim has no code behind it. So a person captures the token once, about yearly.
+
+**In Claude Code cloud sessions**, the container is temporary, so the saved file goes with it. Keep
+the token in the environment settings as the durable copy. If `invo_auth.py status` ever says the file
+holds a newer refresh token than the env var, copy it into the setting.
 
 **Treat these tokens like a password.** Never commit them; `.env` is gitignored.
 
@@ -320,6 +348,7 @@ Results are reported for each half of the data, next to buy-and-hold.
 | `config.py` | Env-var config with validation and a rate-budget check |
 | `state.py` | Atomic JSON state and fills log |
 | `ratelimit.py` | Sliding-window limiter |
+| `token_store.py` / `invo_auth.py` | Saved Invo tokens (0600, atomic) and the import/status/refresh CLI |
 | `pattern_backtest.py` | Optional: in-sample/out-of-sample backtest of candlestick patterns on real HL candles |
 | `strategy_backtest.py` | Optional: classic indicator strategies backtested on real HL candles, ranked by win rate with expectancy/OOS beside it |
 | `ta_features.py` | Optional: TA-Lib candlestick patterns + indicators on real HL candles (analysis only) |
