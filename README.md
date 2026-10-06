@@ -229,6 +229,40 @@ one alone refuses to start. On start it prints a banner and waits 10 seconds so 
 - Hyperliquid fees on fills are estimated (base taker rate). Account equity is authoritative.
 - The bot assumes it is the only thing trading that account.
 
+## 6. Technical analysis (optional): TA-Lib patterns and indicators
+
+[TA-Lib](https://ta-lib.org) 0.8 provides 61 candlestick patterns and about 140 indicators. It runs on
+real Hyperliquid candles from the public `candleSnapshot` endpoint, so no keys are needed.
+
+```sh
+pip install -r requirements-analysis.txt              # TA-Lib wheel bundles the C library; plus pandas, numpy
+python ta_features.py BTC --interval 1h --bars 500    # default indicators + patterns in the last 5 closed bars
+python ta_features.py ETH --interval 4h --all --csv eth_4h.csv   # every indicator, full table to CSV
+```
+
+- **Default indicators:**
+  - RSI14
+  - MACD (12/26/9)
+  - Bollinger Bands (20, 2σ)
+  - ATR14
+  - ADX14
+  - EMA 20/50/200
+  - OBV
+- **`--all`:** runs every TA-Lib function in the overlap, momentum, volume, volatility, cycle,
+  price-transform and statistic groups with default parameters. MAVP is skipped because it needs a
+  per-bar periods series.
+- **The still-forming last bar is dropped by default**, because a pattern on an unfinished candle can
+  vanish. `--include-forming` keeps it.
+- **Pattern values:** +100 is bullish and −100 bearish (some patterns give ±200 for the confirmed
+  variant).
+  - Indecision/shape patterns (doji, spinning top, high-wave, marubozu, long/short line) are labeled
+    as such, not as bullish or bearish. TA-Lib's sign for them is just the candle color.
+
+> **Analysis only.** None of this feeds `bot.py`'s decisions. Candlestick patterns have weak
+> out-of-sample evidence, and none of these signals has been validated for this strategy. Using one as
+> an entry/exit filter would need its own backtest first. Past behavior of a pattern or indicator does
+> not guarantee future results.
+
 ## Project layout
 
 | File | Role |
@@ -243,6 +277,7 @@ one alone refuses to start. On start it prints a banner and waits 10 seconds so 
 | `config.py` | Env-var config with validation and a rate-budget check |
 | `state.py` | Atomic JSON state and fills log |
 | `ratelimit.py` | Sliding-window limiter |
+| `ta_features.py` | Optional: TA-Lib candlestick patterns + indicators on real HL candles (analysis only) |
 
 ## What is verified vs. assumed
 

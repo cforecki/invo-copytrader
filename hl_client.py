@@ -105,3 +105,27 @@ def verify_wallet(address: str, days: int = 90) -> dict:
         "hl_win_rate_pct": round(100 * wins / len(closing), 1) if closing else None,
         "hl_account_value_usd": round(acct_value, 2),
     }
+
+
+INTERVAL_MS = {"1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+               "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "8h": 28_800_000,
+               "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000}
+
+
+def candles(coin: str, interval: str = "1h", bars: int = 500, end_ms: int | None = None,
+            session=None) -> list[dict]:
+    """Real OHLCV candles from Hyperliquid's candleSnapshot (max ~5000 most recent bars).
+
+    Returns raw dicts: t (open ms), T (close ms), o/h/l/c/v (strings), n (trade count).
+    The last bar is usually still forming -- callers decide whether to drop it.
+    """
+    if interval not in INTERVAL_MS:
+        raise HyperliquidError(f"unsupported interval {interval!r}; use one of {sorted(INTERVAL_MS)}")
+    end_ms = end_ms or int(time.time() * 1000)
+    start_ms = end_ms - bars * INTERVAL_MS[interval]
+    out = _info({"type": "candleSnapshot",
+                 "req": {"coin": normalize_coin(coin), "interval": interval,
+                         "startTime": start_ms, "endTime": end_ms}}, session)
+    if not isinstance(out, list):
+        raise HyperliquidError(f"candleSnapshot {coin}: unexpected response {str(out)[:200]}")
+    return out

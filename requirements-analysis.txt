@@ -1,0 +1,5 @@
+-r requirements.txt
+# Optional: technical analysis (ta_features.py). Not needed by the screener or bot.
+numpy>=1.26
+pandas>=2.2
+TA-Lib>=0.6,<0.9
