@@ -274,6 +274,33 @@ simulation against buy-and-hold.
 - Patterns selected on the first half mostly failed on the second half (0/3, 1/6, 1/6 stayed net-positive).
 - Every simulated strategy underperformed buy-and-hold.
 
+**Backtest classic strategies, ranked by win rate:**
+
+```sh
+python strategy_backtest.py --interval 1h    # also try --interval 4h (about 2.3 years of history)
+```
+
+It tests 8 textbook strategies with fixed, un-optimized parameters:
+- RSI(14) reversion
+- Connors RSI(2)
+- Bollinger reversion
+- MACD cross
+- EMA 20/50 cross
+- Donchian breakout
+- ADX trend
+- a "tight TP / wide SL" trap that demonstrates the win-rate problem
+
+Rules: fill at the next bar's open, stop-loss first when a bar touches both levels, fees on both sides.
+Results are reported for each half of the data, next to buy-and-hold.
+
+**Result of the 2026-10-06 run:** the highest win rates were the worst bets.
+- The TP 0.5% / SL 5% trap won 89–92% of trades, but one loss (about −430 to −510 bps) erased about
+  11 wins.
+- Bollinger reversion won 61–69% and lost money in every period.
+- The only strategies positive in both halves on 4h were low-win-rate trend followers (ADX+EMA,
+  EMA 20/50, Donchian; 31–45% wins). They came with 28–63% drawdowns and large differences between
+  coins.
+
 > **Analysis only.** None of this feeds `bot.py`'s decisions. Candlestick patterns have weak
 > out-of-sample evidence, and none of these signals has been validated for this strategy. Using one as
 > an entry/exit filter would need its own backtest first. Past behavior of a pattern or indicator does
@@ -294,6 +321,7 @@ simulation against buy-and-hold.
 | `state.py` | Atomic JSON state and fills log |
 | `ratelimit.py` | Sliding-window limiter |
 | `pattern_backtest.py` | Optional: in-sample/out-of-sample backtest of candlestick patterns on real HL candles |
+| `strategy_backtest.py` | Optional: classic indicator strategies backtested on real HL candles, ranked by win rate with expectancy/OOS beside it |
 | `ta_features.py` | Optional: TA-Lib candlestick patterns + indicators on real HL candles (analysis only) |
 
 ## What is verified vs. assumed
