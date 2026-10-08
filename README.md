@@ -329,6 +329,32 @@ Results are reported for each half of the data, next to buy-and-hold.
   EMA 20/50, Donchian; 31–45% wins). They came with 28–63% drawdowns and large differences between
   coins.
 
+**Trend-following research (wider universe, volatility-scaled, funding included):**
+
+```sh
+python trend_research.py                  # 12 coins, daily bars, about 6 years; first run caches funding history
+python trend_research.py --interval 4h    # about 2.3 years
+```
+
+- Each coin gets an equal sleeve, sized to 40% annual volatility with no leverage.
+- Hyperliquid funding is charged hourly from 2023-05 onward, when its data begins.
+- Equity is marked to market every bar, so drawdowns include open losses.
+- Results are broken down per coin and per year, and a 13-config parameter sweep is shown as a
+  distribution, never as a picked winner.
+
+**Result of the 2026-10-08 run:**
+- **Daily bars:**
+  - Risk-adjusted return was about the same as buy-and-hold (Sharpe 0.8–1.0 vs 0.84–0.88), with much
+    smaller drawdowns (38–71% vs 77–84%). The main benefit was largely sidestepping 2022 (−1% to −8%
+    vs −74%).
+  - All 13 sweep configs were positive, but returns lean heavily on 2021 and on a few coins (DOGE,
+    AVAX).
+  - Since 2023-05, with full costs, the best headline (ADX+EMA: Sharpe 0.95, max drawdown 23%) matched
+    BTC buy-and-hold's Sharpe (0.96) with less than half its drawdown (53%). It did not beat BTC's
+    return.
+- **4h bars:** weaker than buy-and-hold (Sharpe about 0.46 vs 0.59). EMA and Donchian lost money in
+  2025.
+
 > **Analysis only.** None of this feeds `bot.py`'s decisions. Candlestick patterns have weak
 > out-of-sample evidence, and none of these signals has been validated for this strategy. Using one as
 > an entry/exit filter would need its own backtest first. Past behavior of a pattern or indicator does
@@ -351,6 +377,7 @@ Results are reported for each half of the data, next to buy-and-hold.
 | `token_store.py` / `invo_auth.py` | Saved Invo tokens (0600, atomic) and the import/status/refresh CLI |
 | `pattern_backtest.py` | Optional: in-sample/out-of-sample backtest of candlestick patterns on real HL candles |
 | `strategy_backtest.py` | Optional: classic indicator strategies backtested on real HL candles, ranked by win rate with expectancy/OOS beside it |
+| `trend_research.py` | Optional: multi-coin trend-following research with vol sizing, funding, per-year/per-coin robustness |
 | `ta_features.py` | Optional: TA-Lib candlestick patterns + indicators on real HL candles (analysis only) |
 
 ## What is verified vs. assumed
